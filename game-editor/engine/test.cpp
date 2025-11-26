@@ -23,8 +23,6 @@ EMSCRIPTEN_BINDINGS(my_module)
 #define SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT "SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT"
 #endif
 
-
-
 const int GAME_WIDTH = 1920;
 const int GAME_HEIGHT = 1080;
 
@@ -41,7 +39,8 @@ std::vector<Vec2> triangle = {
 };
 
 void render_frame() {
-    if (!renderer) return;
+    if (!renderer)
+        return;
 
     int w, h;
     SDL_GetWindowSize(window, &w, &h);
