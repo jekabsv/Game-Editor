@@ -1,43 +1,36 @@
 import { useState, useEffect, useRef } from 'react';
-import testModule from "../wasm/test.mjs";
+import engine_Module from "../wasm/engine.mjs";
 
 interface WasmModule {
   test: () => string;
-  initInElement: (elementId: string) => boolean;
+  Engine: any; // class exported from Emscripten
   canvas?: HTMLCanvasElement | string | null;
-  render_frame: () => void;
 }
 
 let wasmModule: WasmModule | null = null;
 
-
 function App() {
+  const [insertLocked, setInsertLocked] = useState(false);
+  const [insertHovered, setInsertHovered] = useState(false);
+
+  const toggleInsertLock = () => setInsertLocked(!insertLocked);
+
+  const engineRef = useRef<any | null>(null);
+  const initRef = useRef(false);
+
   useEffect(() => {
-    testModule().then((Module: WasmModule) => {
+    engine_Module().then((Module: WasmModule) => {
       wasmModule = Module;
       const canvas = document.getElementById('canvas') as HTMLCanvasElement | null;
       if (canvas) wasmModule.canvas = canvas;
     }).catch((err: unknown) => console.error('Failed to load wasm module', err));
   }, []);
 
-  const [insertLocked, setInsertLocked] = useState(false);
-  const [insertHovered, setInsertHovered] = useState(false);
-
-  const toggleInsertLock = () => setInsertLocked(!insertLocked);
-
-  const initRef = useRef(false);
-
-
-  const handleAddTriangle = () => 
-  {
-    if (!wasmModule) 
-    {
-        console.log("No WASM moduele found!");
-        return;
+  const handleAddTriangle = () => {
+    if (!wasmModule) {
+      console.log("No WASM module found!");
+      return;
     }
-    const result: string = wasmModule.test();
-    console.log(result);
-
 
     try {
       let canvas = document.getElementById('canvas') as HTMLCanvasElement | null;
@@ -46,31 +39,38 @@ function App() {
         if (parent) {
           canvas = document.createElement('canvas');
           canvas.id = 'canvas';
-          // style to fill parent; override as you like
           canvas.style.width = '100%';
           canvas.style.height = '100%';
           parent.appendChild(canvas);
         }
       }
-      // expose the canvas to the Emscripten module object so Browser.getCanvas() works
+
       if (canvas && wasmModule) {
         wasmModule.canvas = canvas;
       }
 
-      
+      // create engine instance once
+      if (!engineRef.current) {
+        engineRef.current = new wasmModule.Engine();
+      }
 
+      const engine = engineRef.current;
+
+      // initialize once
       if (!initRef.current) {
-        const ok = wasmModule.initInElement("#preview-canvas");
-        console.log('initInElement returned', ok);
+        const ok = engine.Initialize("#preview-canvas");
+        console.log('Initialize returned', ok);
         initRef.current = true;
       }
-      
+
+      // add triangle
+      engine.AddTriangle();
+
+      // render frame
+      engine.Render();
+    } catch (err) {
+      console.error('handleAddTriangle failed:', err);
     }
-    catch (err) 
-    {
-      console.error('initInElement failed:', err);
-    }
-    wasmModule.render_frame();
   };
 
   const insertOpen = insertLocked || insertHovered;
@@ -124,7 +124,7 @@ function App() {
             {/* Add a real canvas early so Emscripten can register event handlers without errors */}
             <canvas id="canvas" className="w-full h-full" />
             <div className="absolute text-center pointer-events-none">
-              <p className="text-gray-500">Preview Area — canvas will appear here</p>
+              <p className="text-gray-500"></p>
             </div>
           </div>
         </div>
